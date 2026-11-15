@@ -1,14 +1,13 @@
-# SRB2MEM - SRB2 2.0 for Android
+# SRB2MEM - SRB2 2.0 for Android!
 
-Sonic Robo Blast 2 **v2.0.7** (the original 2.0 source from STJr/SRB2-Public) ported to
-Android with SDL2. Software renderer only, on-screen touch controls, SDL2_mixer audio.
+SRB2MEM (MEM stands for Marriage Edition Mobile) is an Android port of SRB2 2.0 (version 2.0.7 to be exact) with SDL2. It currently has Software renderer only, on-screen touch controls and SDL2_mixer audio.
 
 ## Build status
 
 The native code (the whole engine + SDL2 + SDL2_mixer) was compiled with the real Android NDK r26d
-for both `arm64-v8a` and `armeabi-v7a` and links cleanly. It has **not** been run on a device yet.
+for both `arm64-v8a` and `armeabi-v7a` and links cleanly.
 
-## Get the APK (no PC tools needed)
+## Get the APK! (no PC tools needed)
 
 1. Create a free GitHub account and a new **empty repository**.
 2. Upload everything in this folder (drag and drop the files/folders into the repo page,
@@ -17,6 +16,7 @@ for both `arm64-v8a` and `armeabi-v7a` and links cleanly. It has **not** been ru
    (it also runs automatically on every push).
 4. After ~10-20 minutes open the finished run and download **SRB2MEM-apk**
    from *Artifacts*. Unzip it and install `app-release.apk` (allow "install unknown apps").
+5. Alternatively, install it from GitHub Releases (you need to copy the game files to `.srb2` or `gamedata/` folder in `/storage/emulated/0/SRB2MEM/`
 
 The workflow downloads SDL2, SDL2_mixer and the official SRB2 2.0.6 data files for you.
 If the data download fails, put `srb2.wad`, `zones.dta`, `soar.dta`, `drill.dta`, `music.dta`,
@@ -31,7 +31,7 @@ permission on older versions); after you allow it the app creates the folder and
 
 ## App icon
 
-`app/src/main/res/mipmap-*/ic_launcher.png` - the 48x48 pixel-art icon, scaled up with nearest-neighbour for each screen density.
+`app/src/main/res/mipmap-*/ic_launcher.png` (the app icon was scaled up to `xxxhdpi` using Nearest Neighbor)
 
 ## Controls
 
@@ -40,7 +40,7 @@ Touch overlay (appears after the first touch): d-pad on the left; **A** jump, **
 The on-screen keyboard appears automatically while the console is open. A hardware keyboard works too
 (arrows, `/` jump, `.` spin, Right Ctrl fire). The Android Back button = Escape.
 
-## What was changed from the 2.0 source
+## What was changed from the SRB2 2.0 source:
 
 - `src/sdl2/i_video.c` - new SDL2 video backend (replaces SDL 1.2 `sdl/i_video.c`), touch controls, on-screen keyboard for the console
 - `src/sdl2/sdl12_shim.h` - force-included; maps the few remaining SDL 1.2 calls to SDL2
@@ -66,3 +66,7 @@ The on-screen keyboard appears automatically while the console is open. A hardwa
 - If something fails, the app writes these into `/storage/emulated/0/SRB2ME/`: `crash.txt` (native crash
   backtrace), `srb2_stdout.txt` / `srb2_stderr.txt` (everything the engine printed), `java_crash.txt`
   and `logcat_last.txt` (Android log of the previous run), plus `srb2/srb2log.txt`. Send those.
+
+## Additional info
+1. **Game assets are owned by Sonic Team Jr. (STJr) meanwhile the "Sonic" brand and characters are owned by SEGA.**
+2. It's licensed under the **GNU General Public License 2**, any modification and distribution of the mod requires open-sourcing the app.
