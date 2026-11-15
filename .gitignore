@@ -1,0 +1,9 @@
+.gradle/
+build/
+app/build/
+app/.cxx/
+local.properties
+# fetched by the workflow
+app/src/main/jni/SDL/
+app/src/main/jni/SDL2_mixer/
+app/src/main/java/org/libsdl/

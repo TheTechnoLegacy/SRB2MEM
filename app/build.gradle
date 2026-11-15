@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.techno.srb2mem'
+    compileSdk 34
+    ndkVersion '26.3.11579264'
+
+    defaultConfig {
+        applicationId 'com.techno.srb2mem'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '0.1'
+
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+        externalNativeBuild {
+            ndkBuild {
+                // SDL2_mixer codecs: OGG (stb), MP3, FLAC, WAV, MOD (libxmp), MIDI (timidity)
+                arguments 'SUPPORT_MOD_XMP=true',
+                          'SUPPORT_MID_TIMIDITY=true',
+                          'SUPPORT_WAVPACK=false'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path 'src/main/jni/Android.mk'
+        }
+    }
+
+    sourceSets {
+        main {
+            // game data (srb2.wad, music.dta, ...) is packed into the APK and
+            // copied to the app's files dir on first launch
+            assets.srcDirs = ['../gamedata']
+        }
+    }
+
+    buildTypes {
+        release {
+            // optimized native code, signed with the debug key so it installs directly
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
