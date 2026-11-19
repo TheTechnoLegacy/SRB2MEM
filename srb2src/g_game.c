@@ -667,6 +667,8 @@ angle_t localangle, localangle2;
 
 static fixed_t forwardmove[2] = {25/NEWTICRATERATIO, 50/NEWTICRATERATIO};
 static fixed_t sidemove[2] = {25/NEWTICRATERATIO, 50/NEWTICRATERATIO}; // faster!
+INT32 touch_turn = 0; // pending swipe-to-turn amount (angleturn units, positive = left), set by the touch backend
+
 static fixed_t angleturn[3] = {640/NEWTICRATERATIO, 1280/NEWTICRATERATIO, 320/NEWTICRATERATIO}; // + slow turn
 
 void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics)
@@ -992,6 +994,16 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics)
 
 	cmd->forwardmove = (SINT8)(cmd->forwardmove + forward);
 	cmd->sidemove = (SINT8)(cmd->sidemove + side);
+
+	// touch screen: swipe-to-turn adds directly to the turn amount (works in normal and Analog mode)
+	if (touch_turn)
+	{
+		INT32 turn = (INT32)cmd->angleturn + touch_turn;
+		if (turn > 32000) turn = 32000;
+		else if (turn < -32000) turn = -32000;
+		cmd->angleturn = (INT16)turn;
+		touch_turn = 0;
+	}
 
 	localangle += (cmd->angleturn<<16);
 	cmd->angleturn = (INT16)(localangle >> 16);

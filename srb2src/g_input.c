@@ -1070,6 +1070,11 @@ void G_Controldefault(void)
 	gamecontrol[gc_jump       ][1] = KEY_MOUSE1+1;
 	gamecontrol[gc_console    ][0] = KEY_CONSOLE;
 	gamecontrol[gc_pause      ][0] = KEY_PAUSE;
+#ifdef __ANDROID__
+	// match the on-screen touch buttons: A = jump ('/'), B = spin ('.'); A/D strafe, X fire are already default
+	gamecontrol[gc_jump       ][1] = '/';
+	gamecontrol[gc_use        ][1] = '.';
+#endif
 #ifdef WMINPUT
 	gamecontrol[gc_forward    ][0] = KEY_JOY1+02; //UP
 	gamecontrol[gc_backward   ][0] = KEY_JOY1+03; //DOWN

@@ -1241,6 +1241,64 @@ void M_ScreenShot(void)
   *
   * \sa HWR_ScreenShot
   */
+#if defined (__ANDROID__) && !defined (USE_PNG)
+// Android: no libpng, so write an indexed PNG directly with zlib
+#define USE_ANDROID_PNG
+#include <zlib.h>
+
+static void png_put32(UINT8 *p, UINT32 v) { p[0]=(UINT8)(v>>24); p[1]=(UINT8)(v>>16); p[2]=(UINT8)(v>>8); p[3]=(UINT8)v; }
+
+static boolean png_chunk(FILE *f, const char *type, const UINT8 *data, UINT32 len)
+{
+	UINT8 hdr[8], crc[4];
+	uLong c;
+	png_put32(hdr, len);
+	memcpy(hdr + 4, type, 4);
+	c = crc32(0L, (const Bytef *)type, 4);
+	if (len) c = crc32(c, data, len);
+	png_put32(crc, (UINT32)c);
+	if (fwrite(hdr, 1, 8, f) != 8) return false;
+	if (len && fwrite(data, 1, len, f) != len) return false;
+	return fwrite(crc, 1, 4, f) == 4;
+}
+
+static boolean M_SavePNG(const char *filename, void *data, int width, int height, const UINT8 *palette)
+{
+	static const UINT8 sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+	FILE *f;
+	UINT8 ihdr[13], *raw, *packed;
+	size_t rawsize = (size_t)(width + 1) * (size_t)height, y;
+	uLongf packedsize;
+	boolean ok;
+
+	raw = (UINT8 *)malloc(rawsize);
+	packedsize = compressBound((uLong)rawsize);
+	packed = (UINT8 *)malloc(packedsize);
+	if (!raw || !packed) { free(raw); free(packed); return false; }
+	for (y = 0; y < (size_t)height; y++)
+	{
+		raw[y * (width + 1)] = 0;
+		memcpy(raw + y * (width + 1) + 1, (const UINT8 *)data + y * width, (size_t)width);
+	}
+	if (compress2(packed, &packedsize, raw, (uLong)rawsize, 6) != Z_OK) { free(raw); free(packed); return false; }
+	free(raw);
+
+	f = fopen(filename, "wb");
+	if (!f) { free(packed); return false; }
+	png_put32(ihdr, (UINT32)width); png_put32(ihdr + 4, (UINT32)height);
+	ihdr[8] = 8; ihdr[9] = 3; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+	ok = fwrite(sig, 1, 8, f) == 8
+		&& png_chunk(f, "IHDR", ihdr, 13)
+		&& png_chunk(f, "PLTE", palette, 768)
+		&& png_chunk(f, "IDAT", packed, (UINT32)packedsize)
+		&& png_chunk(f, "IEND", NULL, 0);
+	free(packed);
+	if (fclose(f) != 0) ok = false;
+	return ok;
+}
+
+#endif
+
 void M_DoScreenShot(void)
 {
 #if NUMSCREENS > 2
@@ -1252,7 +1310,11 @@ void M_DoScreenShot(void)
 	takescreenshot = false;
 
 	if (cv_screenshot_option.value == 0)
+#ifdef __ANDROID__
+		pathname = srb2path; // the visible game folder (SRB2ME), not the hidden config folder
+#else
 		pathname = usehome ? srb2home : srb2path;
+#endif
 	else if (cv_screenshot_option.value == 1)
 		pathname = srb2home;
 	else if (cv_screenshot_option.value == 2)
@@ -1260,7 +1322,7 @@ void M_DoScreenShot(void)
 	else if (cv_screenshot_option.value == 3 && *cv_screenshot_folder.string != '\0')
 		pathname = cv_screenshot_folder.string;
 
-#ifdef USE_PNG
+#if defined (USE_PNG) || defined (USE_ANDROID_PNG)
 	if (rendermode != render_none)
 		freename = Newsnapshotfile(pathname,"png");
 #else
@@ -1290,7 +1352,7 @@ void M_DoScreenShot(void)
 #endif
 	if (rendermode != render_none)
 	{
-#ifdef USE_PNG
+#if defined (USE_PNG) || defined (USE_ANDROID_PNG)
 		ret = M_SavePNG(va(pandf,pathname,freename), linear, vid.width, vid.height,
 			W_CacheLumpName(GetPalette(), PU_CACHE));
 #else

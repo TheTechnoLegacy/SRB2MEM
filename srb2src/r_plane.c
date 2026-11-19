@@ -174,8 +174,8 @@ static void R_DrawTranslucentWaterSpan_8(void)
 	// bit per power of two (obviously)
 	// Ok, because I was able to eliminate the variable spot below, this function is now FASTER
 	// than the original span renderer. Whodathunkit?
-	xposition = ds_xfrac << nflatshiftup; yposition = (ds_yfrac + waterofs) << nflatshiftup;
-	xstep = ds_xstep << nflatshiftup; ystep = ds_ystep << nflatshiftup;
+	xposition = (UINT32)ds_xfrac << nflatshiftup; yposition = (UINT32)(ds_yfrac + waterofs) << nflatshiftup;
+	xstep = (UINT32)ds_xstep << nflatshiftup; ystep = (UINT32)ds_ystep << nflatshiftup;
 
 	source = ds_source;
 	colormap = ds_colormap;
@@ -232,6 +232,17 @@ static void R_DrawTranslucentWaterSpan_8(void)
 }
 #endif
 
+// Like FixedMul, but saturates instead of wrapping around. A floor row near the horizon seen from
+// high above (e.g. flying with Tails) is further away than a 32-bit fixed_t can hold; wrapping gave
+// garbage distances, which stretched the flat texture into big blocks (a "green glitch").
+static fixed_t R_FixedMulSat(fixed_t a, fixed_t b)
+{
+	const INT64 r = ((INT64)a * (INT64)b) >> FRACBITS;
+	if (r > 0x7FFFFFFF) return (fixed_t)0x7FFFFFFF;
+	if (r < -(INT64)0x7FFFFFFF) return (fixed_t)-0x7FFFFFFF;
+	return (fixed_t)r;
+}
+
 void R_MapPlane(INT32 y, INT32 x1, INT32 x2)
 {
 	angle_t angle;
@@ -249,9 +260,9 @@ void R_MapPlane(INT32 y, INT32 x1, INT32 x2)
 	if (planeheight != cachedheight[y])
 	{
 		cachedheight[y] = planeheight;
-		distance = cacheddistance[y] = FixedMul(planeheight, yslope[y]);
-		ds_xstep = cachedxstep[y] = FixedMul(distance, basexscale);
-		ds_ystep = cachedystep[y] = FixedMul(distance, baseyscale);
+		distance = cacheddistance[y] = R_FixedMulSat(planeheight, yslope[y]);
+		ds_xstep = cachedxstep[y] = R_FixedMulSat(distance, basexscale);
+		ds_ystep = cachedystep[y] = R_FixedMulSat(distance, baseyscale);
 	}
 	else
 	{
@@ -260,7 +271,7 @@ void R_MapPlane(INT32 y, INT32 x1, INT32 x2)
 		ds_ystep = cachedystep[y];
 	}
 
-	length = FixedMul (distance,distscale[x1]);
+	length = R_FixedMulSat(distance, distscale[x1]);
 	angle = (currentplane->viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
 	/// \note Wouldn't it be faster just to add viewx and viewy
 	// to the plane's x/yoffs anyway??

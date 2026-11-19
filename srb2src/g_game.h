@@ -58,6 +58,7 @@ extern tic_t timeinmap; // Ticker for time spent in level (used for levelcard di
 // used in game menu
 extern consvar_t cv_crosshair, cv_crosshair2;
 extern consvar_t cv_invertmouse, cv_alwaysfreelook, cv_mousemove;
+extern INT32 touch_turn;
 extern consvar_t cv_sideaxis,cv_turnaxis,cv_moveaxis,cv_lookaxis,cv_fireaxis,cv_firenaxis;
 extern consvar_t cv_sideaxis2,cv_turnaxis2,cv_moveaxis2,cv_lookaxis2,cv_fireaxis2,cv_firenaxis2;
 

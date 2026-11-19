@@ -94,7 +94,7 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := -include sdl2/sdl12_shim.h \
     -DLINUX -DSDL -DUNIXCOMMON -DNOASM -DNONX86 -DNOPIX -DHAVE_SDL -DHAVE_MIXER \
     -DNOTERMIOS -DNOIPX -DLOGMESSAGES -DDEFAULTDIR=\"srb2\" \
-    -fcommon -fsigned-char -w \
+    -fcommon -fsigned-char -fwrapv -fno-strict-aliasing -w \
     -Wno-implicit-function-declaration -Wno-int-conversion -Wno-implicit-int \
     -Wno-incompatible-function-pointer-types -Wno-incompatible-pointer-types \
     -Wno-deprecated-non-prototype

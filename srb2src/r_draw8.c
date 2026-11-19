@@ -538,8 +538,8 @@ void R_DrawSpan_8 (void)
 	// bit per power of two (obviously)
 	// Ok, because I was able to eliminate the variable spot below, this function is now FASTER
 	// than the original span renderer. Whodathunkit?
-	xposition = ds_xfrac << nflatshiftup; yposition = ds_yfrac << nflatshiftup;
-	xstep = ds_xstep << nflatshiftup; ystep = ds_ystep << nflatshiftup;
+	xposition = (UINT32)ds_xfrac << nflatshiftup; yposition = (UINT32)ds_yfrac << nflatshiftup;
+	xstep = (UINT32)ds_xstep << nflatshiftup; ystep = (UINT32)ds_ystep << nflatshiftup;
 
 	source = ds_source;
 	colormap = ds_colormap;
@@ -617,8 +617,8 @@ void R_DrawSplat_8 (void)
 	// bit per power of two (obviously)
 	// Ok, because I was able to eliminate the variable spot below, this function is now FASTER
 	// than the original span renderer. Whodathunkit?
-	xposition = ds_xfrac << nflatshiftup; yposition = ds_yfrac << nflatshiftup;
-	xstep = ds_xstep << nflatshiftup; ystep = ds_ystep << nflatshiftup;
+	xposition = (UINT32)ds_xfrac << nflatshiftup; yposition = (UINT32)ds_yfrac << nflatshiftup;
+	xstep = (UINT32)ds_xstep << nflatshiftup; ystep = (UINT32)ds_ystep << nflatshiftup;
 
 	source = ds_source;
 	colormap = ds_colormap;
@@ -734,8 +734,8 @@ void R_DrawTranslucentSplat_8 (void)
 	// bit per power of two (obviously)
 	// Ok, because I was able to eliminate the variable spot below, this function is now FASTER
 	// than the original span renderer. Whodathunkit?
-	xposition = ds_xfrac << nflatshiftup; yposition = ds_yfrac << nflatshiftup;
-	xstep = ds_xstep << nflatshiftup; ystep = ds_ystep << nflatshiftup;
+	xposition = (UINT32)ds_xfrac << nflatshiftup; yposition = (UINT32)ds_yfrac << nflatshiftup;
+	xstep = (UINT32)ds_xstep << nflatshiftup; ystep = (UINT32)ds_ystep << nflatshiftup;
 
 	source = ds_source;
 	colormap = ds_colormap;
@@ -832,8 +832,8 @@ void R_DrawTranslucentSpan_8 (void)
 	// bit per power of two (obviously)
 	// Ok, because I was able to eliminate the variable spot below, this function is now FASTER
 	// than the original span renderer. Whodathunkit?
-	xposition = ds_xfrac << nflatshiftup; yposition = ds_yfrac << nflatshiftup;
-	xstep = ds_xstep << nflatshiftup; ystep = ds_ystep << nflatshiftup;
+	xposition = (UINT32)ds_xfrac << nflatshiftup; yposition = (UINT32)ds_yfrac << nflatshiftup;
+	xstep = (UINT32)ds_xstep << nflatshiftup; ystep = (UINT32)ds_ystep << nflatshiftup;
 
 	source = ds_source;
 	colormap = ds_colormap;

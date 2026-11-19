@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "SDL.h"
 
@@ -24,6 +25,8 @@
 #include "../console.h"
 #include "../command.h"
 #include "../keys.h"
+#include "../d_netcmd.h"
+#include "../g_input.h"
 #include "sdlmain.h"
 
 #define MAXWINMODES (27)
@@ -55,16 +58,18 @@ static char vidModeName[MAXWINMODES+1][32];
 // Touch controls
 // ---------------------------------------------------------------------------
 
-enum { TC_UP, TC_DOWN, TC_LEFT, TC_RIGHT, TC_JUMP, TC_SPIN, TC_FIRE, TC_ENTER, TC_ESC, TC_CONSOLE, TC_COUNT };
+enum { TC_UP, TC_DOWN, TC_LEFT, TC_RIGHT, TC_JUMP, TC_SPIN, TC_FIRE, TC_ENTER, TC_ESC, TC_CONSOLE, TC_SCREENSHOT, TC_COUNT };
 
 static const INT32 tcKey[TC_COUNT] =
 {
 	KEY_UPARROW, KEY_DOWNARROW, KEY_LEFTARROW, KEY_RIGHTARROW,
-	'/', '.', KEY_RCTRL, KEY_ENTER, KEY_ESCAPE, KEY_CONSOLE
+	'/', '.', KEY_RCTRL, KEY_ENTER, KEY_ESCAPE, KEY_CONSOLE, KEY_F8
 };
 
 #define MAXFINGERS 10
-static struct { SDL_FingerID id; int active; float x, y; } fingers[MAXFINGERS];
+// role: 0 = pressing on-screen controls, 1 = "look" finger (started outside every control; swipes turn the camera)
+static struct { SDL_FingerID id; int active; int role; float x, y; } fingers[MAXFINGERS];
+static INT32 tcPosted[TC_COUNT];       // key actually sent for each control while it is held
 static boolean tcHeld[TC_COUNT];       // key state we have told the game about
 static boolean touchMode = false;     // overlay shown once a finger touched the screen
 
@@ -132,7 +137,39 @@ static void TouchLayout(int w, int h, float *u, float *dpx, float *dpy, tcbutton
 	b[3].cx = w - U*1.0f; b[3].cy = U*0.55f;    b[3].r = U*0.5f;  b[3].id = TC_ENTER; b[3].label = "OK";
 	b[4].cx = U*0.9f;     b[4].cy = U*0.55f;    b[4].r = U*0.5f;  b[4].id = TC_ESC;   b[4].label = "ESC";
 	b[5].cx = w - U*2.5f; b[5].cy = U*0.55f;    b[5].r = U*0.5f;  b[5].id = TC_CONSOLE; b[5].label = "CON";
-	*nb = 6;
+	b[6].cx = w - U*4.0f; b[6].cy = U*0.55f;    b[6].r = U*0.5f;  b[6].id = TC_SCREENSHOT; b[6].label = "SS";
+	*nb = 7;
+}
+
+// d-pad left/right press A/D (strafe) while playing, but the arrow keys in menus and the console
+static INT32 TouchKeyFor(int id)
+{
+	const boolean uiActive = menuactive || con_destlines > 0;
+	if (id == TC_LEFT)  return uiActive ? KEY_LEFTARROW  : 'a';
+	if (id == TC_RIGHT) return uiActive ? KEY_RIGHTARROW : 'd';
+	return tcKey[id];
+}
+
+// is the point (in pixels) on the d-pad or on one of the buttons?
+static boolean TouchPointInControl(float fx, float fy, int w, int h)
+{
+	float u, dpx, dpy;
+	tcbutton_t b[8];
+	int k, nb;
+	float dx, dy;
+
+	TouchLayout(w, h, &u, &dpx, &dpy, b, &nb);
+	dx = fx - dpx;
+	dy = fy - dpy;
+	if (dx*dx + dy*dy < (u*2.2f)*(u*2.2f))
+		return true;
+	for (k = 0; k < nb; k++)
+	{
+		const float bx = fx - b[k].cx, by = fy - b[k].cy, r = b[k].r * 1.25f;
+		if (bx*bx + by*by < r*r)
+			return true;
+	}
+	return false;
 }
 
 static void TouchUpdate(void)
@@ -151,7 +188,7 @@ static void TouchUpdate(void)
 	for (i = 0; i < MAXFINGERS; i++)
 	{
 		float fx, fy;
-		if (!fingers[i].active) continue;
+		if (!fingers[i].active || fingers[i].role != 0) continue; // look fingers never press buttons
 		fx = fingers[i].x * w;
 		fy = fingers[i].y * h;
 
@@ -179,10 +216,91 @@ static void TouchUpdate(void)
 		if (want[i] != tcHeld[i])
 		{
 			tcHeld[i] = want[i];
+			if (want[i]) tcPosted[i] = TouchKeyFor(i); // release the same key that was pressed
 			memset(&ev, 0, sizeof(ev));
 			ev.type = want[i] ? ev_keydown : ev_keyup;
-			ev.data1 = tcKey[i];
+			ev.data1 = tcPosted[i];
 			D_PostEvent(&ev);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Swipe to look: a finger that starts outside every control turns the camera.
+//  - horizontal: added straight to the turn amount of the next tic command (touch_turn), so it
+//    works the same in normal and Analog mode and does not depend on the mouse sensitivity
+//  - vertical: mouse-look aiming (only when mouse-look is on)
+// Speed: console variable "touchsens" (percent, default 100).
+// ---------------------------------------------------------------------------
+#define LOOK_TURN_FULLWIDTH 56000.0f  // angleturn units (65536 = 360 degrees) for a swipe across the whole width at 100% (~308 degrees)
+// Vertical uses the SAME angle per swiped pixel as horizontal: one mouse-look unit is 8 turn units
+// (360/8192 degrees vs 360/65536), and a full-height swipe is H/W of a full-width swipe.
+#define LOOK_AIM_MAXUNITS 2000        // per tic; keeps (units << 19) from wrapping past 180 degrees
+
+extern consvar_t cv_mlooksens;
+
+static CV_PossibleValue_t touchsens_cons_t[] = {{10, "MIN"}, {1000, "MAX"}, {0, NULL}};
+static consvar_t cv_touchsens = {"touchsens", "100", CV_SAVE, touchsens_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+
+static float lookDX = 0.0f, lookDY = 0.0f;   // pending swipe, as a fraction of the screen
+static tic_t lookLastTic = 0;
+
+static void TouchLookReset(void)
+{
+	lookDX = lookDY = 0.0f;
+}
+
+static void TouchLookUpdate(void)
+{
+	const float sens = (float)cv_touchsens.value / 100.0f;
+	const tic_t now = I_GetTime();
+	event_t ev;
+
+	if (con_destlines > 0) // typing in the console: ignore swipes
+	{
+		TouchLookReset();
+		return;
+	}
+
+	// horizontal: swipe right = turn right (the engine's positive turn is to the left)
+	if (lookDX != 0.0f)
+	{
+		const float k = LOOK_TURN_FULLWIDTH * sens;
+		const INT32 turn = (INT32)(-lookDX * k);
+		if (turn)
+		{
+			touch_turn += turn;
+			lookDX += (float)turn / k;    // keep the fractional remainder
+		}
+	}
+
+	// vertical: one mouse event per game tic (the engine keeps only the last one)
+	if (!cv_alwaysfreelook.value)
+		lookDY = 0.0f;
+	else if (lookDY != 0.0f && now != lookLastTic)
+	{
+		int ow = 0, oh = 0;
+		float aspect = 0.625f;
+		float k;
+		INT32 my;
+
+		if (renderer) SDL_GetRendererOutputSize(renderer, &ow, &oh);
+		if (ow > 0 && oh > 0) aspect = (float)oh / (float)ow;
+		k = LOOK_TURN_FULLWIDTH * sens * aspect / 8.0f;
+		// undo the engine's own mouse-look scaling so a changed "mlooksens" does not alter the swipe
+		k /= ((float)cv_mlooksens.value * (float)cv_mlooksens.value) / 110.0f + 0.1f;
+		my = (INT32)(-lookDY * k);
+		if (my > LOOK_AIM_MAXUNITS) my = LOOK_AIM_MAXUNITS;
+		else if (my < -LOOK_AIM_MAXUNITS) my = -LOOK_AIM_MAXUNITS;
+		if (my)
+		{
+			memset(&ev, 0, sizeof(ev));
+			ev.type = ev_mouse;
+			ev.data2 = 0;
+			ev.data3 = my;
+			D_PostEvent(&ev);
+			lookLastTic = now;
+			lookDY += (float)my / k;
 		}
 	}
 }
@@ -197,6 +315,18 @@ static void TouchFinger(const SDL_TouchFingerEvent *tf, int type)
 		for (i = 0; i < MAXFINGERS; i++)
 			if (!fingers[i].active) { slot = i; break; }
 	if (slot < 0) return;
+
+	if (type == SDL_FINGERDOWN)
+	{
+		int w = 640, h = 400;
+		if (renderer) SDL_GetRendererOutputSize(renderer, &w, &h);
+		fingers[slot].role = TouchPointInControl(tf->x * w, tf->y * h, w, h) ? 0 : 1;
+	}
+	else if (type == SDL_FINGERMOTION && fingers[slot].role == 1)
+	{
+		lookDX += tf->dx;
+		lookDY += tf->dy;
+	}
 
 	fingers[slot].id = tf->fingerId;
 	fingers[slot].x = tf->x;
@@ -428,6 +558,7 @@ void I_GetEvent(void)
 					memset(fingers, 0, sizeof(fingers));
 					TouchUpdate();
 					for (i = 0; i < TC_COUNT; i++) tcHeld[i] = false;
+					TouchLookReset();
 				}
 				break;
 
@@ -448,6 +579,8 @@ void I_GetEvent(void)
 				break;
 		}
 	}
+
+	TouchLookUpdate();
 }
 
 void I_StartupMouse(void) {}
@@ -620,6 +753,7 @@ void I_StartupGraphics(void)
 		return;
 
 	CV_RegisterVar(&cv_vidwait);
+	CV_RegisterVar(&cv_touchsens);
 
 	keyboard_started = true;
 
